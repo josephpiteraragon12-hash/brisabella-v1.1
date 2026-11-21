@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # necesario solo para adjuntar los .exe a un Release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar MinGW-w64 (32 y 64 bits)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-mingw-w64-x86-64 gcc-mingw-w64-i686 binutils-mingw-w64-x86-64 binutils-mingw-w64-i686
+
+      - name: Compilar
+        run: make
+
+      - name: Verificar arquitecturas
+        run: |
+          file dist/*.exe
+          file dist/Brisabella-x64.exe | grep -q "PE32+ executable"
+          file dist/Brisabella-x86.exe | grep -q "PE32 executable"
+          cd dist && sha256sum *.exe | tee SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Brisabella
+          path: dist/*
+
+      - name: Publicar Release (solo con tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
